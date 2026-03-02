@@ -62,3 +62,38 @@ return {
 	end,
 }
 ```
+
+## Keybindings
+
+### Global Mappings
+Assuming the setup above, these are your primary commands:
+
+| Key | Action | Command/Plug |
+| :--- | :--- | :--- |
+| `<leader>ls` | Start LanguageTool server | `<Plug>(LTStartServer)` |
+| `<leader>lc` | Check the whole buffer | `<Plug>(LTCheck)` |
+| `<leader>lv` | Check visual selection | `<Plug>(LTCheckVisual)` |
+| `<leader>lq` | Start Interactive Quickfix mode | `<Plug>(LTQuickfix)` |
+| `<leader>le` | Show error under cursor | `<Plug>(LTErrorAtPoint)` |
+| `<leader>lx` | Clear highlights & close popups | `<Plug>(LTClear)` |
+
+### Popup UI (Quickfix / Error at Point)
+When a floating window with suggestions is open, you can use the following keys:
+
+| Key | Action |
+| :--- | :--- |
+| `1`-`9` | Apply the corresponding suggestion and move to the next |
+| `i` | Add the word to your `ignore.txt` file |
+| `u` | Undo the last applied fix and go back one step |
+| `b` | Go back to the previous error (without undoing text) |
+| `q` | Close the popup |
+
+## Credits
+
+This project is heavily inspired by [vigoux/LanguageTool.nvim](https://github.com/vigoux/LanguageTool.nvim).
+
+## License
+
+The **Languagetools-nvim** plugin is distributed under the VIM LICENSE (see `:help copyright` in Neovim, replacing "Vim" with "Languagetools-nvim").
+
+[LanguageTool](https://languagetool.org/) is an independent software project and is freely available under the LGPL license.
