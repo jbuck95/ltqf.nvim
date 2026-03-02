@@ -4,7 +4,6 @@ A lightweight, fast, and customizable Neovim plugin for local spelling and gramm
 
 ## Features 
 
-- **Local Server Management:** Automatically starts and stops the local Java LanguageTool server.
 - **Buffer Highlights:** Direct visual highlighting of errors and spelling mistakes in your buffer.
 - **Interactive Quickfix-Mode:** Quickly jump through errors with a floating popup. Includes apply, ignore, undo, and go-back functionality.
 - **Persistent Ignore-List:** Case-sensitive ignore list, saved simply as a `.txt` file for easy editing.
@@ -66,6 +65,13 @@ return {
 }
 ```
 
+## Usage
+
+1. Start the Server via keybind
+2. Check
+3. Quickfix / manually correct the text
+
+
 ## Keybindings
 
 ### Global Mappings
@@ -96,6 +102,6 @@ This project is heavily inspired by [vigoux/LanguageTool.nvim](https://github.co
 
 ## License
 
-The **Languagetools-nvim** plugin is distributed under the VIM LICENSE (see `:help copyright` in Neovim, replacing "Vim" with "Languagetools-nvim").
+The **ltqf.nvim** plugin is distributed under the VIM LICENSE (see `:help copyright` in Neovim, replacing "Vim" with "Languagetools-nvim").
 
 [LanguageTool](https://languagetool.org/) is an independent software project and is freely available under the LGPL license.
