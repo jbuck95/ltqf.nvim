@@ -11,6 +11,8 @@ A lightweight, fast, and customizable Neovim plugin for local spelling and gramm
 - **Advanced Filtering:** Regex-based filters to exclude specific lines (e.g., Blockquotes), entire blocks (via start/end tokens like `# Literature`), and inline elements (e.g., Markdown footnotes or LaTeX commands) from being sent to the server.
 - **Floating UI:** Conveniently view errors and apply correction suggestions directly under the cursor.
 
+https://github.com/user-attachments/assets/aff6e251-e5ee-435a-9fe5-54b33f7b5b1e
+
 ## Prerequisites
 
 You need to download the offline version of LanguageTool:
