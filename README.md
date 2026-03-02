@@ -30,7 +30,8 @@ return {
 
 	config = function()
 		require("languagetools").setup({
-			language = "de-DE",      -- Set your Language!  
+			--language = "de-DE",    -- Set your Language!  
+			language = "en-GB",
 			server_jar = vim.fn.expand("~/LanguageTool-6.6/languagetool-server.jar"),
 			server_command = "java --enable-native-access=ALL-UNNAMED -cp '"
 				.. vim.fn.expand("~/LanguageTool-6.6/*")
@@ -48,8 +49,8 @@ return {
 				"^%s*>",      -- Blockquotes + whitespace
 			},
 
-			check_start_token = "^# Einleitung", -- Content to check - Start
-			check_end_token = "^# Literatur", -- End of Content to check
+			-- check_start_token = "^# Introduction", -- Start the check from here
+			-- check_end_token = "^# Literature", -- End check here
 		})
 
 		local map = vim.keymap.set
@@ -66,7 +67,6 @@ return {
 ## Keybindings
 
 ### Global Mappings
-Assuming the setup above, these are your primary commands:
 
 | Key | Action | Command/Plug |
 | :--- | :--- | :--- |
@@ -78,7 +78,7 @@ Assuming the setup above, these are your primary commands:
 | `<leader>lx` | Clear highlights & close popups | `<Plug>(LTClear)` |
 
 ### Popup UI (Quickfix / Error at Point)
-When a floating window with suggestions is open, you can use the following keys:
+When a floating window with suggestions is open, you can use the following actions:
 
 | Key | Action |
 | :--- | :--- |
