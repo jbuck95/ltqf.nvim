@@ -1,4 +1,4 @@
-# Languagetools.nvim
+# ltqf.nvim - LanguageTool-QuickFix 
 
 A lightweight, fast, and customizable Neovim plugin for local spelling and grammar checking using LanguageTool.
 

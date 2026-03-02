@@ -1,4 +1,4 @@
--- /home/jan/.config/nvim/lua/languagetools/config.lua
+-- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/ltqf.nvim/config.lua
 local M = {}
 
 M.default_config = {

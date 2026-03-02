@@ -1,4 +1,4 @@
--- /home/jan/.config/nvim/lua/languagetools/ui.lua
+-- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/ltqf.nvim/ui.lua
 local M = {}
 
 local function get_pos_from_offset(bufnr, char_offset_global)
