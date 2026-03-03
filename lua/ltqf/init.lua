@@ -1,11 +1,14 @@
--- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/ltqf.nvim/init.lua
+-- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/languagetools/init.lua
 local M = {}
 
-local config = require("languagetools.config")
-local ui = require("languagetools.ui")
-local filter = require("languagetools.filter")
+local config = require("ltqf.config")
+local ui = require("ltqf.ui")
+local filter = require("ltqf.filter")
 
 M.filter = filter
+
+local diag_ns = vim.api.nvim_create_namespace("languagetool_diag")
+local hl_ns   = vim.api.nvim_create_namespace("languagetool_hl")
 
 local function url_encode(str)
 	str = string.gsub(str, "([^%w%._~-])", function(c) return string.format("%%%02X", string.byte(c)) end)
@@ -16,7 +19,6 @@ local job_id
 local matches = {}
 local server_is_running = false
 local _current_opts = {}
-
 local ignored_words_path
 
 local function load_ignored_words()
@@ -24,9 +26,7 @@ local function load_ignored_words()
 	if not f then return {} end
 	local words = {}
 	for line in f:lines() do
-		if line and line ~= "" then
-			words[line] = true
-		end
+		if line and line ~= "" then words[line] = true end
 	end
 	f:close()
 	return words
@@ -35,7 +35,6 @@ end
 local function save_ignored_word(word)
 	local words = load_ignored_words()
 	if words[word] then return end
-	
 	local f = io.open(ignored_words_path, "a")
 	if f then
 		f:write(word .. "\n")
@@ -88,26 +87,61 @@ local quickfix_mode_state = {
 	undo_stack = {},
 }
 
+local function publish_diagnostics(bufnr, matches_to_show)
+	vim.schedule(function()
+		if not vim.api.nvim_buf_is_valid(bufnr) then return end
+		local diagnostics = {}
+		local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+
+		for _, match in ipairs(matches_to_show) do
+			local lnum, col_char = get_pos_from_offset(bufnr, match.offset)
+			local end_lnum, end_col_char = get_pos_from_offset(bufnr, match.offset + match.length)
+			local line     = all_lines[lnum + 1]
+			local end_line = all_lines[end_lnum + 1]
+			if not line or not end_line then goto continue end
+			local col_byte     = vim.fn.byteidx(line, col_char)
+			local end_col_byte = vim.fn.byteidx(end_line, end_col_char)
+			if col_byte == -1 then goto continue end
+			if end_col_byte == -1 then end_col_byte = #end_line end
+			local severity = vim.diagnostic.severity.WARN
+			if match.rule and match.rule.issueType == "misspelling" then
+				severity = vim.diagnostic.severity.INFO
+			end
+			table.insert(diagnostics, {
+				lnum = lnum, col = col_byte,
+				end_lnum = end_lnum, end_col = end_col_byte,
+				message = match.message or "LanguageTool",
+				severity = severity, source = "LanguageTool",
+			})
+			::continue::
+		end
+
+		vim.diagnostic.set(diag_ns, bufnr, diagnostics)
+
+		vim.api.nvim_buf_clear_namespace(bufnr, hl_ns, 0, -1)
+		for _, diag in ipairs(diagnostics) do
+			local group = diag.severity == vim.diagnostic.severity.INFO
+				and "LanguageToolSpellingError"
+				or  "LanguageToolGrammarError"
+			vim.api.nvim_buf_add_highlight(bufnr, hl_ns, group, diag.lnum, diag.col, diag.end_col)
+		end
+	end)
+end
+
 function M.undo_last_fix()
 	if not quickfix_mode_state.is_active or #quickfix_mode_state.undo_stack == 0 then
 		vim.notify("LanguageTool: Nichts zum Rückgängigmachen.", vim.log.levels.WARN)
 		vim.defer_fn(M.quickfix_next_error, 50)
 		return
 	end
-
 	local last_state = table.remove(quickfix_mode_state.undo_stack)
-
 	if last_state.type == "fix" then
-		vim.api.nvim_buf_call(last_state.bufnr, function()
-			vim.cmd("undo")
-		end)
+		vim.api.nvim_buf_call(last_state.bufnr, function() vim.cmd("undo") end)
 	end
-
 	matches = last_state.matches
 	quickfix_mode_state.matches = last_state.qf_matches
 	quickfix_mode_state.current_index = last_state.index
-
-	M.highlight_errors(last_state.bufnr)
+	publish_diagnostics(last_state.bufnr, matches)
 	vim.defer_fn(M.quickfix_next_error, 50)
 end
 
@@ -117,7 +151,6 @@ function M.go_back_without_undo()
 		vim.defer_fn(M.quickfix_next_error, 50)
 		return
 	end
-	
 	quickfix_mode_state.current_index = quickfix_mode_state.current_index - 1
 	vim.defer_fn(M.quickfix_next_error, 50)
 end
@@ -127,10 +160,8 @@ function M.check_visual()
 	local bufnr = vim.api.nvim_get_current_buf()
 	local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
 	local lines_to_check = vim.api.nvim_buf_get_lines(bufnr, start_line - 1, end_line, false)
-
 	local text = url_encode(table.concat(lines_to_check, "\n"))
 	local payload = "language=" .. conf.language .. "&text=" .. text
-
 	local command = { "curl", "-s", "-X", "POST", "--data-binary", "@-", "http://localhost:8081/v2/check" }
 
 	vim.notify("LanguageTool: Checking selection...", vim.log.levels.INFO, { title = "LanguageTool" })
@@ -160,7 +191,6 @@ function M.check_visual()
 			end
 		end,
 	})
-
 	if job > 0 then
 		vim.api.nvim_chan_send(job, payload)
 		vim.fn.chanclose(job, "stdin")
@@ -193,26 +223,19 @@ function M.check(bufnr, on_complete_callback)
 	end
 
 	local original_lines = vim.list_extend({}, lines_to_check)
-	
-	local block_filtered = {}
-	local block_map = {}
+	local block_filtered, block_map = {}, {}
 	local is_checking = (not conf.check_start_token) or conf.check_start_token == ""
-	
+
 	for i, line in ipairs(lines_to_check) do
-		if conf.check_end_token and conf.check_end_token ~= "" and line:match(conf.check_end_token) then
-			is_checking = false
-		end
-		if conf.check_start_token and conf.check_start_token ~= "" and line:match(conf.check_start_token) then
-			is_checking = true
-		end
+		if conf.check_end_token and conf.check_end_token ~= "" and line:match(conf.check_end_token) then is_checking = false end
+		if conf.check_start_token and conf.check_start_token ~= "" and line:match(conf.check_start_token) then is_checking = true end
 		if is_checking then
 			table.insert(block_filtered, line)
 			table.insert(block_map, i)
 		end
 	end
 
-	local filtered_lines = {}
-	local line_map = {}
+	local filtered_lines, line_map = {}, {}
 	for i, line in ipairs(block_filtered) do
 		if filter.should_check_line(line, conf.exclude_patterns) then
 			table.insert(filtered_lines, line)
@@ -227,13 +250,11 @@ function M.check(bufnr, on_complete_callback)
 
 	local text_to_check = table.concat(filtered_lines, "\n")
 	local cleaned_text, removals = filter.remove_inline_patterns(text_to_check, conf.inline_exclude_patterns)
-
 	local text = url_encode(cleaned_text)
 	local payload = "language=" .. conf.language .. "&text=" .. text
-
 	local command = { "curl", "-s", "-X", "POST", "--data-binary", "@-", "http://localhost:8081/v2/check" }
-
 	local stdout_chunks = {}
+
 	local job = vim.fn.jobstart(command, {
 		on_stdout = function(_, data) if data then table.insert(stdout_chunks, data) end end,
 		on_stderr = function(_, data) if data and data[1] and data[1] ~= "" then vim.notify("LT Error: " .. table.concat(data, "\n"), vim.log.levels.ERROR) end end,
@@ -254,7 +275,6 @@ function M.check(bufnr, on_complete_callback)
 			local corrected_matches = {}
 			for _, match in ipairs(response.matches) do
 				local word = get_word_from_match(match)
-				
 				if not (word and ignored[word]) then
 					local offset_with_inline = filter.adjust_offset_for_removals(match.offset, removals)
 					local adjusted_offset = filter.adjust_offset(offset_with_inline, line_map, original_lines, filtered_lines)
@@ -263,16 +283,15 @@ function M.check(bufnr, on_complete_callback)
 				end
 			end
 			matches = corrected_matches
-			M.highlight_errors(bufnr)
+			publish_diagnostics(bufnr, matches)
+
 			local qflist_items = {}
 			for _, match in ipairs(matches) do
 				local lnum, col = get_pos_from_offset(bufnr, match.offset)
 				table.insert(qflist_items, { bufnr = bufnr, lnum = lnum + 1, col = col + 1, text = match.message })
 			end
 			vim.fn.setqflist(qflist_items)
-			if on_complete_callback then
-				on_complete_callback(matches)
-			end
+			if on_complete_callback then on_complete_callback(matches) end
 		end,
 	})
 
@@ -312,16 +331,14 @@ function M.quickfix_next_error()
 		})
 
 		local word = get_word_from_match(error_match)
-		
 		if not word or word == "" then return end
 		save_ignored_word(word)
 		vim.notify('LanguageTool: Ignored "' .. word .. '"', vim.log.levels.INFO)
-		
+
 		local new_matches = {}
 		local removed_before_current = 0
 		for i, m in ipairs(matches) do
 			local mword = get_word_from_match(m)
-			
 			if mword ~= word then
 				table.insert(new_matches, m)
 			elseif i < quickfix_mode_state.current_index then
@@ -329,7 +346,7 @@ function M.quickfix_next_error()
 			end
 		end
 		matches = new_matches
-		M.highlight_errors(bufnr)
+		publish_diagnostics(bufnr, matches)
 		quickfix_mode_state.matches = new_matches
 		quickfix_mode_state.current_index = quickfix_mode_state.current_index - removed_before_current
 		vim.defer_fn(M.quickfix_next_error, 50)
@@ -359,35 +376,11 @@ function M.toggle_quickfix_mode()
 	M.quickfix_next_error()
 end
 
-function M.highlight_errors(bufnr)
-	local ns = vim.api.nvim_create_namespace("languagetool")
-	vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
-	if not matches or #matches == 0 then return end
-	local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-	local function get_byte_offsets(line, char_start, char_len)
-		local start_byte = vim.fn.byteidx(line, char_start)
-		local end_byte = vim.fn.byteidx(line, char_start + char_len)
-		return start_byte, end_byte
-	end
-	for _, match in ipairs(matches) do
-		local lnum_char, col_char = get_pos_from_offset(bufnr, match.offset)
-		local line_content = all_lines[lnum_char + 1]
-		if line_content then
-			local byte_start_col, byte_end_col = get_byte_offsets(line_content, col_char, match.length)
-			local group = "LanguageToolGrammarError"
-			if match.rule and match.rule.issueType == "misspelling" then group = "LanguageToolSpellingError" end
-			if byte_start_col > -1 and byte_end_col > -1 and byte_start_col < byte_end_col then
-				vim.api.nvim_buf_add_highlight(bufnr, ns, group, lnum_char, byte_start_col, byte_end_col)
-			end
-		end
-	end
-end
-
 function M.clear()
 	matches = {}
 	local bufnr = vim.api.nvim_get_current_buf()
-	local ns = vim.api.nvim_create_namespace("languagetool")
-	vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+	vim.diagnostic.reset(diag_ns, bufnr)
+	vim.api.nvim_buf_clear_namespace(bufnr, hl_ns, 0, -1)
 	vim.fn.setqflist({})
 	vim.cmd("cclose")
 end
@@ -415,7 +408,7 @@ function M.apply_fix(bufnr, error_match, suggestion_nr)
 	if not start_line_content or not end_line_content then return end
 	local start_col_byte = vim.fn.byteidx(start_line_content, start_col_char)
 	local end_col_byte = vim.fn.byteidx(end_line_content, end_col_char)
-	
+
 	vim.api.nvim_buf_set_text(bufnr, start_lnum_char, start_col_byte, end_lnum_char, end_col_byte, { replacement })
 
 	if quickfix_mode_state.is_active then
@@ -432,7 +425,7 @@ function M.apply_fix(bufnr, error_match, suggestion_nr)
 			end
 		end
 		matches = new_matches
-		M.highlight_errors(bufnr)
+		publish_diagnostics(bufnr, matches)
 		quickfix_mode_state.matches = new_matches
 		vim.defer_fn(M.quickfix_next_error, 50)
 	else
@@ -443,13 +436,12 @@ end
 
 function M.show_error_at_point()
 	local bufnr = vim.api.nvim_get_current_buf()
-	
 	local function ignore_at_point(error_match)
 		local raw_word = get_word_from_match(error_match)
 		if not raw_word or raw_word == "" then return end
 		save_ignored_word(raw_word)
 		vim.notify('LanguageTool: Ignored "' .. raw_word .. '"', vim.log.levels.INFO)
-		
+
 		local new_matches = {}
 		for _, m in ipairs(matches) do
 			local mword = get_word_from_match(m)
@@ -458,9 +450,8 @@ function M.show_error_at_point()
 			end
 		end
 		matches = new_matches
-		M.highlight_errors(bufnr)
+		publish_diagnostics(bufnr, matches)
 	end
-
 	ui.show_error_at_point(matches, M.apply_fix, ignore_at_point)
 end
 
@@ -485,9 +476,7 @@ local function start_server()
 	})
 	if job_id > 0 then
 		server_is_running = true
-		vim.defer_fn(function()
-			M.check(vim.api.nvim_get_current_buf())
-		end, 1000)
+		vim.defer_fn(function() M.check(vim.api.nvim_get_current_buf()) end, 1000)
 	end
 end
 
@@ -501,11 +490,23 @@ end
 
 function M.setup(opts)
 	_current_opts = opts or {}
-	ignored_words_path = _current_opts.ignored_words_path
-		or (vim.fn.stdpath("data") .. "/languagetool_ignored.txt")
+	ignored_words_path = _current_opts.ignored_words_path or (vim.fn.stdpath("data") .. "/languagetool_ignored.txt")
+	vim.api.nvim_create_augroup("LanguageTool", { clear = true })
 
-	vim.api.nvim_set_hl(0, "LanguageToolGrammarError", { bg = "#440000", underline = true })
-	vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400", underline = true })
+	local function set_highlights()
+		vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
+		vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
+	end
+	vim.api.nvim_create_autocmd({ "ColorScheme", "VimEnter" }, {
+		group = "LanguageTool",
+		callback = set_highlights,
+	})
+
+	vim.diagnostic.config({
+		underline    = false,
+		virtual_text = false,
+		signs        = false,
+	}, diag_ns)
 
 	vim.api.nvim_create_user_command("LanguageToolCheck",        function() M.check(vim.api.nvim_get_current_buf()) end, {})
 	vim.api.nvim_create_user_command("LanguageToolClear",        M.clear, {})
@@ -523,7 +524,6 @@ function M.setup(opts)
 	vim.keymap.set("n", "<Plug>(LTQuickfix)",     M.toggle_quickfix_mode)
 	vim.keymap.set("v", "<Plug>(LTCheckVisual)",  M.check_visual)
 
-	vim.api.nvim_create_augroup("LanguageTool", { clear = true })
 	vim.api.nvim_create_autocmd("VimLeave", { pattern = "*", group = "LanguageTool", callback = stop_server })
 end
 

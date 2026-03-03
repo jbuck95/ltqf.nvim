@@ -18,24 +18,22 @@ M.default_config = {
     "%[%^%d+%]",  -- obsidian/md footnotes like [^67]
     "\\newpage",
   },
-	check_start_token = "",
+  check_start_token = "",
   check_end_token = "",
 }
 
 function M.get(user_opts)
-  -- Nutzt user_opts falls vorhanden, sonst leere Tabelle
   local conf = vim.tbl_extend("force", M.default_config, user_opts or {})
   
   if vim.g.languagetool then
     conf = vim.tbl_extend("force", conf, vim.g.languagetool)
   end
 
-  -- Korrektur von 'config' zu 'conf'
   if conf.language == "auto" then
     local lang = vim.o.spelllang
     if lang == "" then
-      -- Korrektur: expand_str existiert nicht, nutze expand
-      lang = vim.fn.expand(vim.v.lang)
+      -- Fehlerbehebung: vim.v.lang als Variable auslesen
+      lang = vim.v.lang
     end
     if lang == "" then
       vim.notify("LanguageTool: Failed to guess language from spelllang or v:lang. Defaulting to en-US.", vim.log.levels.WARN)

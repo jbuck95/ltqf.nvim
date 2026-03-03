@@ -24,8 +24,7 @@ Install and configure the plugin using [lazy.nvim](https://github.com/folke/lazy
 
 ```lua
 return {
-    "jbuck95/languagetools.nvim",
-    name = "languagetools.nvim",
+    "jbuck95/lqtf.nvim",
     ft = { "markdown", "text" },
 	cmd = { "LanguageToolStartServer", "LanguageToolClear", "LanguageToolStopServer", "LanguageToolCheckVisual" },
 
@@ -99,6 +98,12 @@ When a floating window with suggestions is open, you can use the following actio
 ## Credits
 
 This project is heavily inspired by [vigoux/LanguageTool.nvim](https://github.com/vigoux/LanguageTool.nvim).
+
+## Disclaimer
+
+Made for myself and released as part of my .md writing setup, large
+parts are vibe coded.
+
 
 ## License
 
