@@ -68,6 +68,19 @@ return {
 }
 ```
 
+You can also show ltqf-status in your lualine:
+```lua
+{
+    require("ltqf").status,
+    color = function()
+        local s = require("ltqf").status()
+        if s == "✓" then return { fg = "#00ff00" }
+        else return { fg = "#ff6600" }
+        end
+    end
+}
+```
+
 ## Usage
 
 1. Start the Server via keybind
