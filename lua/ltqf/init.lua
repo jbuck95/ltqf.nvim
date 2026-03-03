@@ -159,12 +159,18 @@ function M.check_visual()
 	local conf = config.get(_current_opts)
 	local bufnr = vim.api.nvim_get_current_buf()
 	local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
+	local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 	local lines_to_check = vim.api.nvim_buf_get_lines(bufnr, start_line - 1, end_line, false)
+
+	-- Globaler char-Offset bis zum Start der Selection
+	local selection_char_offset = 0
+	for i = 1, start_line - 1 do
+		selection_char_offset = selection_char_offset + vim.fn.strchars(all_lines[i]) + 1
+	end
+
 	local text = url_encode(table.concat(lines_to_check, "\n"))
 	local payload = "language=" .. conf.language .. "&text=" .. text
 	local command = { "curl", "-s", "-X", "POST", "--data-binary", "@-", "http://localhost:8081/v2/check" }
-
-	vim.notify("LanguageTool: Checking selection...", vim.log.levels.INFO, { title = "LanguageTool" })
 	local stdout_chunks = {}
 
 	local job = vim.fn.jobstart(command, {
@@ -177,18 +183,19 @@ function M.check_visual()
 			if raw_response == "" then return end
 			local ok, response = pcall(vim.fn.json_decode, raw_response)
 			if not ok or not response or not response.matches then return end
-			local qflist = {}
+
+			local ignored = load_ignored_words()
+			local visual_matches = {}
 			for _, match in ipairs(response.matches) do
-				local lnum_relative, col = get_pos_from_offset_on_lines(lines_to_check, match.offset)
-				table.insert(qflist, { bufnr = bufnr, lnum = lnum_relative + start_line, col = col + 1, text = match.message })
+				local word = get_word_from_match(match)
+				if not (word and ignored[word]) then
+					match.offset = match.offset + selection_char_offset
+					table.insert(visual_matches, match)
+				end
 			end
-			if #qflist > 0 then
-				vim.fn.setqflist(qflist)
-				vim.cmd("copen")
-				vim.notify("LanguageTool: Found " .. #qflist .. " issues in selection.", vim.log.levels.INFO)
-			else
-				vim.notify("LanguageTool: No issues found in selection.", vim.log.levels.INFO)
-			end
+			matches = visual_matches
+			publish_diagnostics(bufnr, matches)
+			vim.notify("LanguageTool: Found " .. #matches .. " issues in selection.", vim.log.levels.INFO)
 		end,
 	})
 	if job > 0 then
@@ -476,7 +483,6 @@ local function start_server()
 	})
 	if job_id > 0 then
 		server_is_running = true
-		vim.defer_fn(function() M.check(vim.api.nvim_get_current_buf()) end, 1000)
 	end
 end
 
@@ -486,6 +492,22 @@ local function stop_server()
 		job_id = nil
 		server_is_running = false
 	end
+end
+
+function M.status()
+    if not server_is_running then return "" end
+    local diags = vim.diagnostic.get(0, { namespace = diag_ns })
+    if #diags == 0 then return "✓" end
+    local warn, info = 0, 0
+    for _, d in ipairs(diags) do
+        if d.severity == vim.diagnostic.severity.WARN then warn = warn + 1
+        elseif d.severity == vim.diagnostic.severity.INFO then info = info + 1
+        end
+    end
+    local parts = {}
+    if warn > 0 then table.insert(parts, "G:" .. warn) end
+    if info > 0 then table.insert(parts, "S:" .. info) end
+    return table.concat(parts, " ")
 end
 
 function M.setup(opts)
