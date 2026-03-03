@@ -59,7 +59,7 @@ return {
 		map("n", "<leader>lq", "<Plug>(LTQuickfix)",     { desc = "LT: Quickfix mode" })
 		map("n", "<leader>le", "<Plug>(LTErrorAtPoint)", { desc = "LT: Error at point" })
 		map("n", "<leader>lx", "<Plug>(LTClear)",        { desc = "LT: Clear" })
-		map("v", "<leader>lv", "<Plug>(LTCheckVisual)",  { desc = "LT: Check visual" })
+		map("v", "<leader>lv", ":<C-u>lua require('ltqf').check_visual()<CR>", { desc = "LT: Check visual", silent = true })
 	end,
 }
 ```
