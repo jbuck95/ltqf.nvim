@@ -519,6 +519,7 @@ function M.setup(opts)
 		vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
 		vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
 	end
+	set_highlights()
 	vim.api.nvim_create_autocmd({ "ColorScheme", "VimEnter" }, {
 		group = "LanguageTool",
 		callback = set_highlights,
