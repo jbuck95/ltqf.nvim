@@ -24,8 +24,8 @@ Install and configure the plugin using [lazy.nvim](https://github.com/folke/lazy
 
 ```lua
 return {
-    "jbuck95/lqtf.nvim",
-    ft = { "markdown", "text" },
+	"jbuck95/lqtf.nvim",
+	ft = { "markdown", "text" },
 	cmd = { "LanguageToolStartServer", "LanguageToolClear", "LanguageToolStopServer", "LanguageToolCheckVisual" },
 
 	config = function()
@@ -60,10 +60,10 @@ return {
 		map("n", "<leader>le", "<Plug>(LTErrorAtPoint)", { desc = "LT: Error at point" })
 		map("n", "<leader>lx", "<Plug>(LTClear)",        { desc = "LT: Clear" })
 		map("v", "<leader>lv", ":<C-u>lua require('ltqf').check_visual()<CR>", { desc = "LT: Check visual", silent = true })
-vim.schedule(function()
-        vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
-        vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
-    end)
+		vim.schedule(function()
+			vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
+			vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
+		end)
 	end,
 }
 ```
