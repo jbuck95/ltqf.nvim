@@ -35,10 +35,18 @@ end
 local function save_ignored_word(word)
 	local words = load_ignored_words()
 	if words[word] then return end
-	local f = io.open(ignored_words_path, "a")
+
+	local dir = vim.fn.fnamemodify(ignored_words_path, ":h")
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, "p")
+	end
+
+	local f, err = io.open(ignored_words_path, "a")
 	if f then
 		f:write(word .. "\n")
 		f:close()
+	else
+		vim.notify("Could not write ignore file." .. tostring(err), vim.log.levels.ERROR)
 	end
 end
 
