@@ -1,4 +1,4 @@
--- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/languagetools/init.lua
+-- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/ltqf/init.lua
 local M = {}
 
 local config = require("ltqf.config")
