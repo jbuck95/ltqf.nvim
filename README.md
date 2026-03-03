@@ -36,7 +36,7 @@ return {
 			server_command = "java --enable-native-access=ALL-UNNAMED -cp '"
 				.. vim.fn.expand("~/LanguageTool-6.6/*")
 				.. "' org.languagetool.server.HTTPServer &> /dev/null",
-			ignored_words_path = vim.fn.expand("~/.config/nvim/lua/languagetools/ignored.txt"),
+			ignored_words_path = vim.fn.expand("~/Documents/ignored.txt"), -- where the ignored words are saved
 
 			inline_exclude_patterns = {
 				"%[%^%d+%]",  -- Obsidian footnotes [^1]
