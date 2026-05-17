@@ -18,6 +18,16 @@ You need to download the offline version of LanguageTool:
 1. Download the [LanguageTool Desktop/Offline version](https://languagetool.org/download/LanguageTool-stable.zip).
 2. Unzip it to a directory on your machine (e.g., `~/LanguageTool-6.6/`).
 
+## Verify
+
+`:checkhealth ltqf`
+
+## Dependencies
+
+- `java` (JRE/JDK) — for running LanguageTool server
+- `curl` — for downloading LanguageTool
+- Download [LanguageTool](https://languagetool.org/download/LanguageTool-stable.zip) and extract to `~/LanguageTool-6.6/`
+
 ## Installation & Configuration
 
 Install and configure the plugin using [lazy.nvim](https://github.com/folke/lazy.nvim):
