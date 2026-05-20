@@ -25,7 +25,7 @@ You need to download the offline version of LanguageTool:
 ## Dependencies
 
 - `java` (JRE/JDK) — for running LanguageTool server
-- `curl` — for downloading LanguageTool
+- `curl` — for accessing the LanguageTool HTTP API
 - Download [LanguageTool](https://languagetool.org/download/LanguageTool-stable.zip) and extract to `~/LanguageTool-6.6/`
 
 ## Installation & Configuration
@@ -34,49 +34,38 @@ Install and configure the plugin using [lazy.nvim](https://github.com/folke/lazy
 
 ```lua
 return {
-	"jbuck95/lqtf.nvim",
-	ft = { "markdown", "text" },
-	cmd = { "LanguageToolStartServer", "LanguageToolClear", "LanguageToolStopServer", "LanguageToolCheckVisual" },
-
-	config = function()
-		require("languagetools").setup({
-			--language = "de-DE",    -- Set your Language!  
-			language = "en-GB",
-			server_jar = vim.fn.expand("~/LanguageTool-6.6/languagetool-server.jar"),
-			server_command = "java --enable-native-access=ALL-UNNAMED -cp '"
-				.. vim.fn.expand("~/LanguageTool-6.6/*")
-				.. "' org.languagetool.server.HTTPServer &> /dev/null",
-			ignored_words_path = vim.fn.expand("~/Documents/ignored.txt"), -- where the ignored words are saved
-
-			inline_exclude_patterns = {
-				"%[%^%d+%]",  -- Obsidian footnotes [^1]
-				"\\newpage",  -- latex examples 
-				"\\pagebreak",   
-				"\\medskip",   
-			},
-			exclude_patterns = {
-				"^>",         -- Blockquotes
-				"^%s*>",      -- Blockquotes + whitespace
-			},
-
-			-- check_start_token = "^# Introduction", -- Start the check from here
-			-- check_end_token = "^# Literature", -- End check here
-		})
-
-		local map = vim.keymap.set
-		map("n", "<leader>ls", "<Plug>(LTStartServer)",  { desc = "LT: Start server" })
-		map("n", "<leader>lc", "<Plug>(LTCheck)",        { desc = "LT: Check buffer" })
-		map("n", "<leader>lq", "<Plug>(LTQuickfix)",     { desc = "LT: Quickfix mode" })
-		map("n", "<leader>le", "<Plug>(LTErrorAtPoint)", { desc = "LT: Error at point" })
-		map("n", "<leader>lx", "<Plug>(LTClear)",        { desc = "LT: Clear" })
-		map("v", "<leader>lv", ":<C-u>lua require('ltqf').check_visual()<CR>", { desc = "LT: Check visual", silent = true })
-		vim.schedule(function()
-			vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
-			vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
-		end)
-	end,
+  "jbuck95/ltqf.nvim",
+  ft = { "markdown", "text" },
+  cmd = "LanguageTool",
+  keys = {
+    { "<leader>ls", "<Plug>(LTStartServer)",  desc = "LT: Start server" },
+    { "<leader>lc", "<Plug>(LTCheck)",        desc = "LT: Check buffer" },
+    { "<leader>lq", "<Plug>(LTQuickfix)",     desc = "LT: Quickfix mode" },
+    { "<leader>le", "<Plug>(LTErrorAtPoint)", desc = "LT: Error at point" },
+    { "<leader>lx", "<Plug>(LTClear)",        desc = "LT: Clear" },
+    { "<leader>lv", "<Plug>(LTCheckVisual)",  desc = "LT: Check visual", mode = "v" },
+  },
+  opts = {
+    language = "en-GB",
+    languagetool_server_jar = vim.fn.expand("~/LanguageTool-6.6/languagetool-server.jar"),
+    ignored_words_path = vim.fn.stdpath("data") .. "/ltqf_ignored.txt",
+    inline_exclude_patterns = {
+      "%[%^%d+%]",
+      "\\newpage",
+      "\\pagebreak",
+      "\\medskip",
+    },
+    exclude_patterns = {
+      "^>",
+      "^%s*>",
+    },
+    -- check_start_token = "^# Introduction",
+    -- check_end_token = "^# Literature",
+  },
 }
 ```
+
+> **Tip:** See `lua/plugins/ltqf.lua` in the repo for a full example spec.
 
 You can also show ltqf-status in your lualine:
 ```lua
@@ -93,23 +82,49 @@ You can also show ltqf-status in your lualine:
 
 ## Usage
 
-1. Start the Server via keybind
-2. Check
-3. Quickfix / manually correct the text
+1. Start the server (`:LanguageTool start`)
+2. Check the buffer (`:LanguageTool check`)
+3. Run quickfix or manually correct the text
 
+## Commands
+
+All commands are scoped under `:LanguageTool`:
+
+| Command | Action |
+| :--- | :--- |
+| `:LanguageTool start` | Start LanguageTool server |
+| `:LanguageTool stop` | Stop LanguageTool server |
+| `:LanguageTool check` | Check the whole buffer |
+| `:LanguageTool check-visual` | Check current visual selection |
+| `:LanguageTool quickfix` | Toggle interactive quickfix mode |
+| `:LanguageTool error` | Show error under cursor in popup |
+| `:LanguageTool clear` | Clear highlights, diagnostics, and popups |
 
 ## Keybindings
 
-### Global Mappings
+ltqf does **not** create global keymaps. It provides `<Plug>` mappings that you map yourself:
 
-| Key | Action | Command/Plug |
-| :--- | :--- | :--- |
-| `<leader>ls` | Start LanguageTool server | `<Plug>(LTStartServer)` |
-| `<leader>lc` | Check the whole buffer | `<Plug>(LTCheck)` |
-| `<leader>lv` | Check visual selection | `<Plug>(LTCheckVisual)` |
-| `<leader>lq` | Start Interactive Quickfix mode | `<Plug>(LTQuickfix)` |
-| `<leader>le` | Show error under cursor | `<Plug>(LTErrorAtPoint)` |
-| `<leader>lx` | Clear highlights & close popups | `<Plug>(LTClear)` |
+### `<Plug>` Mappings
+
+| Mapping | Mode | Action |
+| :--- | :---: | :--- |
+| `<Plug>(LTStartServer)` | n | Start LanguageTool server |
+| `<Plug>(LTStopServer)` | n | Stop LanguageTool server |
+| `<Plug>(LTCheck)` | n | Check the whole buffer |
+| `<Plug>(LTCheckVisual)` | v | Check visual selection |
+| `<Plug>(LTQuickfix)` | n | Toggle quickfix mode |
+| `<Plug>(LTErrorAtPoint)` | n | Show error under cursor |
+| `<Plug>(LTClear)` | n | Clear everything |
+
+Example mappings:
+```lua
+vim.keymap.set("n", "<leader>ls", "<Plug>(LTStartServer)",  { desc = "LT: Start server" })
+vim.keymap.set("n", "<leader>lc", "<Plug>(LTCheck)",        { desc = "LT: Check buffer" })
+vim.keymap.set("n", "<leader>lq", "<Plug>(LTQuickfix)",     { desc = "LT: Quickfix mode" })
+vim.keymap.set("n", "<leader>le", "<Plug>(LTErrorAtPoint)", { desc = "LT: Error at point" })
+vim.keymap.set("n", "<leader>lx", "<Plug>(LTClear)",        { desc = "LT: Clear" })
+vim.keymap.set("v", "<leader>lv", "<Plug>(LTCheckVisual)",  { desc = "LT: Check visual" })
+```
 
 ### Popup UI (Quickfix / Error at Point)
 When a floating window with suggestions is open, you can use the following actions:
@@ -117,7 +132,7 @@ When a floating window with suggestions is open, you can use the following actio
 | Key | Action |
 | :--- | :--- |
 | `1`-`9` | Apply the corresponding suggestion and move to the next |
-| `i` | Add the word to your `ignore.txt` file |
+| `i` | Add the word to your ignore file |
 | `u` | Undo the last applied fix and go back one step |
 | `b` | Go back to the previous error (without undoing text) |
 | `q` | Close the popup |
@@ -131,9 +146,8 @@ This project is heavily inspired by [vigoux/LanguageTool.nvim](https://github.co
 Made for myself and released as part of my .md writing setup, large
 parts are vibe coded.
 
-
 ## License
 
-The **ltqf.nvim** plugin is distributed under the VIM LICENSE (see `:help copyright` in Neovim, replacing "Vim" with "Languagetools-nvim").
+The **ltqf.nvim** plugin is distributed under the MIT License.
 
 [LanguageTool](https://languagetool.org/) is an independent software project and is freely available under the LGPL license.

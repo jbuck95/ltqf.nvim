@@ -1,5 +1,8 @@
 local M = {}
 
+---@param line string
+---@param patterns string[]
+---@return boolean
 function M.should_check_line(line, patterns)
 	if not patterns or #patterns == 0 then return true end
 	for _, pattern in ipairs(patterns) do
@@ -8,6 +11,10 @@ function M.should_check_line(line, patterns)
 	return true
 end
 
+---@param text string
+---@param patterns string[]
+---@return string text
+---@return table removals
 function M.remove_inline_patterns(text, patterns)
 	if not patterns or #patterns == 0 then return text, {} end
 	local removals = {}
@@ -34,6 +41,9 @@ function M.remove_inline_patterns(text, patterns)
 	return result, removals
 end
 
+---@param offset integer
+---@param removals table
+---@return integer
 function M.adjust_offset_for_removals(offset, removals)
 	if not removals or #removals == 0 then return offset end
 	
@@ -47,6 +57,10 @@ function M.adjust_offset_for_removals(offset, removals)
 	return adjusted
 end
 
+---@param lines string[]
+---@param patterns string[]
+---@return string[]
+---@return integer[] | nil
 function M.filter_lines_with_map(lines, patterns)
 	if not patterns or #patterns == 0 then 
 		return lines, nil
@@ -65,6 +79,11 @@ function M.filter_lines_with_map(lines, patterns)
 	return filtered, line_map
 end
 
+---@param offset integer
+---@param line_map integer[]
+---@param original_lines string[]
+---@param filtered_lines string[]
+---@return integer
 function M.adjust_offset(offset, line_map, original_lines, filtered_lines)
 	if not line_map then return offset end
 	

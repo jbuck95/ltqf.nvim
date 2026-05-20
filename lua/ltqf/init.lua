@@ -1,11 +1,6 @@
--- /home/jan/.config/nvim/lua/dev/ltqf.nvim/lua/ltqf/init.lua
+---@mod ltqf LanguageTool QuickFix plugin
+
 local M = {}
-
-local config = require("ltqf.config")
-local ui = require("ltqf.ui")
-local filter = require("ltqf.filter")
-
-M.filter = filter
 
 local diag_ns = vim.api.nvim_create_namespace("languagetool_diag")
 local hl_ns   = vim.api.nvim_create_namespace("languagetool_hl")
@@ -50,6 +45,7 @@ local function save_ignored_word(word)
 	end
 end
 
+---@param char_offset_global integer
 local function get_pos_from_offset(bufnr, char_offset_global)
 	local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 	local current_global_char_count = 0
@@ -106,22 +102,23 @@ local function publish_diagnostics(bufnr, matches_to_show)
 			local end_lnum, end_col_char = get_pos_from_offset(bufnr, match.offset + match.length)
 			local line     = all_lines[lnum + 1]
 			local end_line = all_lines[end_lnum + 1]
-			if not line or not end_line then goto continue end
-			local col_byte     = vim.fn.byteidx(line, col_char)
-			local end_col_byte = vim.fn.byteidx(end_line, end_col_char)
-			if col_byte == -1 then goto continue end
-			if end_col_byte == -1 then end_col_byte = #end_line end
-			local severity = vim.diagnostic.severity.WARN
-			if match.rule and match.rule.issueType == "misspelling" then
-				severity = vim.diagnostic.severity.INFO
+			if line and end_line then
+				local col_byte     = vim.fn.byteidx(line, col_char)
+				local end_col_byte = vim.fn.byteidx(end_line, end_col_char)
+				if col_byte ~= -1 then
+					if end_col_byte == -1 then end_col_byte = #end_line end
+					local severity = vim.diagnostic.severity.WARN
+					if match.rule and match.rule.issueType == "misspelling" then
+						severity = vim.diagnostic.severity.INFO
+					end
+					table.insert(diagnostics, {
+						lnum = lnum, col = col_byte,
+						end_lnum = end_lnum, end_col = end_col_byte,
+						message = match.message or "LanguageTool",
+						severity = severity, source = "LanguageTool",
+					})
+				end
 			end
-			table.insert(diagnostics, {
-				lnum = lnum, col = col_byte,
-				end_lnum = end_lnum, end_col = end_col_byte,
-				message = match.message or "LanguageTool",
-				severity = severity, source = "LanguageTool",
-			})
-			::continue::
 		end
 
 		vim.diagnostic.set(diag_ns, bufnr, diagnostics)
@@ -136,6 +133,18 @@ local function publish_diagnostics(bufnr, matches_to_show)
 	end)
 end
 
+---@type ltqf.Config | nil
+local _cached_config
+
+---@return ltqf.Config
+local function get_config()
+	if not _cached_config then
+		_cached_config = require("ltqf.config").get(_current_opts)
+	end
+	return _cached_config
+end
+
+---@return nil
 function M.undo_last_fix()
 	if not quickfix_mode_state.is_active or #quickfix_mode_state.undo_stack == 0 then
 		vim.notify("LanguageTool: Nichts zum Rückgängigmachen.", vim.log.levels.WARN)
@@ -153,6 +162,7 @@ function M.undo_last_fix()
 	vim.defer_fn(M.quickfix_next_error, 50)
 end
 
+---@return nil
 function M.go_back_without_undo()
 	if not quickfix_mode_state.is_active or quickfix_mode_state.current_index <= 1 then
 		vim.notify("LanguageTool: Bereits beim ersten Fehler.", vim.log.levels.WARN)
@@ -163,14 +173,14 @@ function M.go_back_without_undo()
 	vim.defer_fn(M.quickfix_next_error, 50)
 end
 
+---@return nil
 function M.check_visual()
-	local conf = config.get(_current_opts)
+	local conf = get_config()
 	local bufnr = vim.api.nvim_get_current_buf()
 	local start_line, end_line = vim.fn.line("'<"), vim.fn.line("'>")
 	local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 	local lines_to_check = vim.api.nvim_buf_get_lines(bufnr, start_line - 1, end_line, false)
 
-	-- Globaler char-Offset bis zum Start der Selection
 	local selection_char_offset = 0
 	for i = 1, start_line - 1 do
 		selection_char_offset = selection_char_offset + vim.fn.strchars(all_lines[i]) + 1
@@ -212,8 +222,12 @@ function M.check_visual()
 	end
 end
 
+---@param bufnr integer
+---@param on_complete_callback? fun(matches: table)
+---@return nil
 function M.check(bufnr, on_complete_callback)
-	local conf = config.get(_current_opts)
+	local conf = get_config()
+	local filter = require("ltqf.filter")
 	local all_lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 	local content_start_line_idx, frontmatter_char_offset = 0, 0
 	if #all_lines > 1 and all_lines[1] == "---" then
@@ -316,6 +330,7 @@ function M.check(bufnr, on_complete_callback)
 	end
 end
 
+---@return nil
 function M.quickfix_next_error()
 	if not quickfix_mode_state.is_active then return end
 	if quickfix_mode_state.current_index > #quickfix_mode_state.matches then
@@ -367,9 +382,11 @@ function M.quickfix_next_error()
 		vim.defer_fn(M.quickfix_next_error, 50)
 	end
 
+	local ui = require("ltqf.ui")
 	ui.show_popup_for_quickfix(bufnr, match, M.apply_fix, on_popup_close, ignore_current, M.undo_last_fix, M.go_back_without_undo)
 end
 
+---@return nil
 function M.toggle_quickfix_mode()
 	if quickfix_mode_state.is_active then
 		quickfix_mode_state.is_active = false
@@ -380,7 +397,7 @@ function M.toggle_quickfix_mode()
 		return
 	end
 	if not matches or #matches == 0 then
-		vim.notify("LanguageTool: No errors found. Run :LanguageToolCheck first.", vim.log.levels.WARN)
+		vim.notify("LanguageTool: No errors found. Run :LanguageTool check first.", vim.log.levels.WARN)
 		return
 	end
 	quickfix_mode_state.is_active = true
@@ -391,6 +408,7 @@ function M.toggle_quickfix_mode()
 	M.quickfix_next_error()
 end
 
+---@return nil
 function M.clear()
 	matches = {}
 	local bufnr = vim.api.nvim_get_current_buf()
@@ -400,6 +418,10 @@ function M.clear()
 	vim.cmd("cclose")
 end
 
+---@param bufnr integer
+---@param error_match table
+---@param suggestion_nr integer
+---@return nil
 function M.apply_fix(bufnr, error_match, suggestion_nr)
 	if not error_match or not error_match.replacements[suggestion_nr] then return end
 
@@ -449,6 +471,7 @@ function M.apply_fix(bufnr, error_match, suggestion_nr)
 	end
 end
 
+---@return nil
 function M.show_error_at_point()
 	local bufnr = vim.api.nvim_get_current_buf()
 	local function ignore_at_point(error_match)
@@ -467,12 +490,14 @@ function M.show_error_at_point()
 		matches = new_matches
 		publish_diagnostics(bufnr, matches)
 	end
+	local ui = require("ltqf.ui")
 	ui.show_error_at_point(matches, M.apply_fix, ignore_at_point)
 end
 
-local function start_server()
+---@return nil
+function M.start_server()
 	if server_is_running then return end
-	local conf = config.get(_current_opts)
+	local conf = get_config()
 	local command = conf.languagetool_server_command
 	if not command or command == "" then
 		local dir = vim.fn.fnamemodify(conf.languagetool_server_jar, ":h")
@@ -494,7 +519,8 @@ local function start_server()
 	end
 end
 
-local function stop_server()
+---@return nil
+function M.stop_server()
 	if job_id then
 		vim.fn.jobstop(job_id)
 		job_id = nil
@@ -502,60 +528,48 @@ local function stop_server()
 	end
 end
 
+---@return string
 function M.status()
-    if not server_is_running then return "" end
-    local diags = vim.diagnostic.get(0, { namespace = diag_ns })
-    if #diags == 0 then return "✓" end
-    local warn, info = 0, 0
-    for _, d in ipairs(diags) do
-        if d.severity == vim.diagnostic.severity.WARN then warn = warn + 1
-        elseif d.severity == vim.diagnostic.severity.INFO then info = info + 1
-        end
-    end
-    local parts = {}
-    if warn > 0 then table.insert(parts, "G:" .. warn) end
-    if info > 0 then table.insert(parts, "S:" .. info) end
-    return table.concat(parts, " ")
+	if not server_is_running then return "" end
+	local diags = vim.diagnostic.get(0, { namespace = diag_ns })
+	if #diags == 0 then return "✓" end
+	local warn, info = 0, 0
+	for _, d in ipairs(diags) do
+		if d.severity == vim.diagnostic.severity.WARN then warn = warn + 1
+		elseif d.severity == vim.diagnostic.severity.INFO then info = info + 1
+		end
+	end
+	local parts = {}
+	if warn > 0 then table.insert(parts, "G:" .. warn) end
+	if info > 0 then table.insert(parts, "S:" .. info) end
+	return table.concat(parts, " ")
 end
 
+---@param opts? ltqf.Config
 function M.setup(opts)
 	_current_opts = opts or {}
 	ignored_words_path = _current_opts.ignored_words_path or (vim.fn.stdpath("data") .. "/languagetool_ignored.txt")
-	vim.api.nvim_create_augroup("LanguageTool", { clear = true })
+	_cached_config = nil
+end
 
-	local function set_highlights()
-		vim.api.nvim_set_hl(0, "LanguageToolGrammarError",  { bg = "#440000" })
-		vim.api.nvim_set_hl(0, "LanguageToolSpellingError", { bg = "#444400" })
+---@param opts { fargs: string[] }
+function M.dispatch(opts)
+	local subcmd = opts.fargs[1]
+	if subcmd == "check" then
+		M.check(vim.api.nvim_get_current_buf())
+	elseif subcmd == "clear" then
+		M.clear()
+	elseif subcmd == "start" then
+		M.start_server()
+	elseif subcmd == "stop" then
+		M.stop_server()
+	elseif subcmd == "error" then
+		M.show_error_at_point()
+	elseif subcmd == "quickfix" then
+		M.toggle_quickfix_mode()
+	elseif subcmd == "check-visual" then
+		M.check_visual()
 	end
-	set_highlights()
-	vim.api.nvim_create_autocmd({ "ColorScheme", "VimEnter" }, {
-		group = "LanguageTool",
-		callback = set_highlights,
-	})
-
-	vim.diagnostic.config({
-		underline    = false,
-		virtual_text = false,
-		signs        = false,
-	}, diag_ns)
-
-	vim.api.nvim_create_user_command("LanguageToolCheck",        function() M.check(vim.api.nvim_get_current_buf()) end, {})
-	vim.api.nvim_create_user_command("LanguageToolClear",        M.clear, {})
-	vim.api.nvim_create_user_command("LanguageToolStartServer",  start_server, {})
-	vim.api.nvim_create_user_command("LanguageToolStopServer",   stop_server, {})
-	vim.api.nvim_create_user_command("LanguageToolErrorAtPoint", M.show_error_at_point, {})
-	vim.api.nvim_create_user_command("LanguageToolQuickfixMode", M.toggle_quickfix_mode, {})
-	vim.api.nvim_create_user_command("LanguageToolCheckVisual",  M.check_visual, { range = true })
-
-	vim.keymap.set("n", "<Plug>(LTCheck)",       function() M.check(vim.api.nvim_get_current_buf()) end)
-	vim.keymap.set("n", "<Plug>(LTClear)",        M.clear)
-	vim.keymap.set("n", "<Plug>(LTStartServer)",  start_server)
-	vim.keymap.set("n", "<Plug>(LTStopServer)",   stop_server)
-	vim.keymap.set("n", "<Plug>(LTErrorAtPoint)", M.show_error_at_point)
-	vim.keymap.set("n", "<Plug>(LTQuickfix)",     M.toggle_quickfix_mode)
-	vim.keymap.set("v", "<Plug>(LTCheckVisual)",  M.check_visual)
-
-	vim.api.nvim_create_autocmd("VimLeave", { pattern = "*", group = "LanguageTool", callback = stop_server })
 end
 
 return M

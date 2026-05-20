@@ -93,6 +93,9 @@ local function create_popup_for_error(bufnr, error_match, apply_fix_func, on_clo
 	end
 end
 
+---@param matches table[]
+---@param apply_fix_func function
+---@param ignore_func function
 function M.show_error_at_point(matches, apply_fix_func, ignore_func)
 	local bufnr = vim.api.nvim_get_current_buf()
 	local cursor = vim.api.nvim_win_get_cursor(0)
@@ -111,6 +114,13 @@ function M.show_error_at_point(matches, apply_fix_func, ignore_func)
 	end
 end
 
+---@param bufnr integer
+---@param match table
+---@param apply_fix_func function
+---@param on_close_callback function
+---@param ignore_func function
+---@param undo_func function
+---@param go_back_func function
 function M.show_popup_for_quickfix(bufnr, match, apply_fix_func, on_close_callback, ignore_func, undo_func, go_back_func)
 	create_popup_for_error(bufnr, match, apply_fix_func, on_close_callback, ignore_func, undo_func, go_back_func)
 end

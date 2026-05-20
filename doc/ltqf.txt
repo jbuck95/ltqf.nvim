@@ -1,0 +1,192 @@
+*ltqf.txt*            LanguageTool QuickFix for Neovim
+
+==============================================================================
+CONTENTS                                                    *ltqf-contents*
+
+  1. Introduction ............................ |ltqf-introduction|
+  2. Commands ................................... |ltqf-commands|
+  3. Keybindings .............................. |ltqf-keybindings|
+  4. Configuration ............................ |ltqf-configuration|
+  5. Lua API ...................................... |ltqf-lua-api|
+  6. Healthcheck ............................... |ltqf-healthcheck|
+
+==============================================================================
+INTRODUCTION                                            *ltqf-introduction*
+
+ltqf.nvim is a lightweight, fast, and customizable Neovim plugin for local
+spelling and grammar checking using LanguageTool.
+
+Features:
+  - Buffer highlights for errors and spelling mistakes
+  - Interactive quickfix mode with a floating popup
+  - Persistent ignore list
+  - Regex-based filters to exclude lines, blocks, and inline elements
+  - Visual selection checking
+
+Dependencies:
+  - Java (JRE/JDK) — required to run the LanguageTool server
+  - curl — required for API calls
+  - LanguageTool offline ZIP: https://languagetool.org/download/
+
+==============================================================================
+COMMANDS                                                  *ltqf-commands*
+
+All commands are scoped under `:LanguageTool`:
+
+:L[anguageTool] start          *:LanguageTool_start*
+        Start the local LanguageTool server.
+
+:L[anguageTool] stop           *:LanguageTool_stop*
+        Stop the local LanguageTool server.
+
+:L[anguageTool] check          *:LanguageTool_check*
+        Run a full buffer check and publish diagnostics.
+
+:L[anguageTool] check-visual   *:LanguageTool_check-visual*
+        Check the current visual selection. Must be called from visual mode
+        with a range (`:'<,'>LanguageTool check-visual`).
+
+:L[anguageTool] quickfix       *:LanguageTool_quickfix*
+        Start or stop the interactive quickfix overlay mode. In this mode
+        you can step through errors and apply or ignore suggestions.
+
+:L[anguageTool] error          *:LanguageTool_error*
+        Show the error at the current cursor position in a floating popup.
+
+:L[anguageTool] clear          *:LanguageTool_clear*
+        Remove all highlights, diagnostics, and close the quickfix panel.
+
+==============================================================================
+KEYBINDINGS                                            *ltqf-keybindings*
+
+ltqf does not create any global keymaps. <Plug> mappings are provided so you
+can define your own keybindings:
+
+    Normal mode ~
+      <Plug>(LTCheck)         Check whole buffer
+      <Plug>(LTClear)         Clear highlights and popups
+      <Plug>(LTStartServer)   Start the LanguageTool server
+      <Plug>(LTStopServer)    Stop the LanguageTool server
+      <Plug>(LTErrorAtPoint)  Show error under cursor
+      <Plug>(LTQuickfix)      Toggle quickfix mode
+
+    Visual mode ~
+      <Plug>(LTCheckVisual)   Check current visual selection
+
+You can map these in your own configuration, e.g.:
+>
+    vim.keymap.set("n", "<leader>ls", "<Plug>(LTStartServer)")
+    vim.keymap.set("n", "<leader>lc", "<Plug>(LTCheck)")
+    vim.keymap.set("n", "<leader>lq", "<Plug>(LTQuickfix)")
+<
+    Popup keybindings ~
+      When a suggestion popup is open (quickfix or error-at-point), these
+      keys are available inside the popup window:
+
+        1-9   Apply the corresponding suggestion
+        i     Ignore the word (add to ignore list)
+        u     Undo the last applied fix
+        b     Go back one error (without undoing text)
+        q     Close the popup
+
+==============================================================================
+CONFIGURATION                                        *ltqf-configuration*
+
+Call |ltqf.setup()| with your overrides. All fields are optional.
+
+Default values:
+>
+    require("ltqf").setup({
+      language = "de-DE",
+      languagetool_server_jar = "~/LanguageTool-6.6/languagetool-server.jar",
+      languagetool_server_command = "",
+      exclude_patterns = { "^>" },
+      inline_exclude_patterns = { "%[%^%d+%]", "\\newpage" },
+      check_start_token = "",
+      check_end_token = "",
+      ignored_words_path = nil,
+    })
+<
+    Fields ~
+      language                   (string)   Language code (e.g. "en-US",
+                                            "de-DE", or "auto" to guess from
+                                            `spelllang` or `v:lang`).
+
+      languagetool_server_jar    (string)   Path to the LanguageTool server
+                                            JAR file.
+
+      languagetool_server_command(string)   Custom command to launch the
+                                            server. If empty, a default Java
+                                            command is built from
+                                            `languagetool_server_jar`.
+
+      exclude_patterns           (table)    Lua patterns for lines to skip.
+                                            E.g. "^>" for blockquotes.
+
+      inline_exclude_patterns    (table)    Lua patterns for inline content
+                                            to strip before sending to the
+                                            server (e.g. footnotes, LaTeX
+                                            commands).
+
+      check_start_token          (string)   Start checking from the line
+                                            matching this pattern.
+                                            Empty = check from beginning.
+
+      check_end_token            (string)   Stop checking at the line
+                                            matching this pattern.
+                                            Empty = check to the end.
+
+      ignored_words_path         (string)   Path to the ignored words file.
+                                            Default: stdpath("data") ..
+                                            "/languagetool_ignored.txt"
+
+==============================================================================
+LUA API                                                    *ltqf-lua-api*
+
+You can call any ltqf function directly instead of using commands:
+
+    require("ltqf").setup(opts)           *ltqf.setup()*
+        Apply user configuration. Does NOT create commands or keymaps
+        (those are provided by |ltqf| at startup via |plugin/ltqf.lua|).
+
+    require("ltqf").check(bufnr, callback) *ltqf.check()*
+        Run a full check on `bufnr` and publish diagnostics.
+
+    require("ltqf").check_visual()         *ltqf.check_visual()*
+        Check the current visual selection.
+
+    require("ltqf").clear()               *ltqf.clear()*
+        Clear all diagnostics, highlights and quickfix list.
+
+    require("ltqf").start_server()         *ltqf.start_server()*
+        Start the LanguageTool HTTP server.
+
+    require("ltqf").stop_server()          *ltqf.stop_server()*
+        Stop the LanguageTool HTTP server.
+
+    require("ltqf").show_error_at_point()  *ltqf.show_error_at_point()*
+        Show a popup for the error under the cursor.
+
+    require("ltqf").toggle_quickfix_mode() *ltqf.toggle_quickfix_mode()*
+        Start or stop interactive quickfix mode.
+
+    require("ltqf").status()              *ltqf.status()*
+        Return a status string for use in statuslines (empty string, "✓",
+        or "G:N S:N").
+
+==============================================================================
+HEALTHCHECK                                            *ltqf-healthcheck*
+
+Run |:checkhealth| to verify your installation:
+>
+    :checkhealth ltqf
+<
+    It checks:
+      - java and curl availability
+      - LanguageTool JAR location
+      - Server connectivity (localhost:8081)
+      - Plugin initialization state
+      - Config validity
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
