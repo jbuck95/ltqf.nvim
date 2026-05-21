@@ -49,15 +49,15 @@ function M.get(user_opts)
     conf = vim.tbl_deep_extend("force", conf, vim.g.languagetool)
   end
 
-  local ok, err = pcall(vim.validate, {
-    languagetool_server_jar = { conf.languagetool_server_jar, "string" },
-    languagetool_server_command = { conf.languagetool_server_command, "string" },
-    language = { conf.language, "string" },
-    exclude_patterns = { conf.exclude_patterns, "table" },
-    inline_exclude_patterns = { conf.inline_exclude_patterns, "table" },
-    check_start_token = { conf.check_start_token, "string" },
-    check_end_token = { conf.check_end_token, "string" },
-  })
+  local ok, err = pcall(function()
+    vim.validate("languagetool_server_jar", conf.languagetool_server_jar, "string")
+    vim.validate("languagetool_server_command", conf.languagetool_server_command, "string")
+    vim.validate("language", conf.language, "string")
+    vim.validate("exclude_patterns", conf.exclude_patterns, "table")
+    vim.validate("inline_exclude_patterns", conf.inline_exclude_patterns, "table")
+    vim.validate("check_start_token", conf.check_start_token, "string")
+    vim.validate("check_end_token", conf.check_end_token, "string")
+  end)
   if not ok then
     vim.notify("ltqf: Invalid config: " .. tostring(err), vim.log.levels.ERROR)
   end

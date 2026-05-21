@@ -12,21 +12,13 @@ A lightweight, fast, and customizable Neovim plugin for local spelling and gramm
 
 https://github.com/user-attachments/assets/aff6e251-e5ee-435a-9fe5-54b33f7b5b1e
 
-## Prerequisites
+## Requirements
 
-You need to download the offline version of LanguageTool:
-1. Download the [LanguageTool Desktop/Offline version](https://languagetool.org/download/LanguageTool-stable.zip).
-2. Unzip it to a directory on your machine (e.g., `~/LanguageTool-6.6/`).
+- `java` (JRE/JDK) -- for running LanguageTool server
+- `curl` -- for accessing the LanguageTool HTTP API
+- [LanguageTool](https://languagetool.org/download/LanguageTool-stable.zip) -- download and extract to `~/LanguageTool-6.6/`
 
-## Verify
-
-`:checkhealth ltqf`
-
-## Dependencies
-
-- `java` (JRE/JDK) — for running LanguageTool server
-- `curl` — for accessing the LanguageTool HTTP API
-- Download [LanguageTool](https://languagetool.org/download/LanguageTool-stable.zip) and extract to `~/LanguageTool-6.6/`
+Verify: `:checkhealth ltqf`  |  Help: `:h ltqf`
 
 ## Installation & Configuration
 
@@ -136,6 +128,61 @@ When a floating window with suggestions is open, you can use the following actio
 | `u` | Undo the last applied fix and go back one step |
 | `b` | Go back to the previous error (without undoing text) |
 | `q` | Close the popup |
+
+## Lua API
+
+All functionality is accessible programmatically:
+
+```lua
+local lt = require("ltqf")
+
+-- Setup with options (optional — works out of the box)
+lt.setup({ language = "en-GB" })
+
+-- Server control
+lt.start_server()   -- Start LanguageTool server
+lt.stop_server()    -- Stop LanguageTool server
+
+-- Checking
+lt.check(bufnr)           -- Check entire buffer
+lt.check_visual()         -- Check visual selection
+lt.clear()                -- Clear highlights, diagnostics, popups
+
+-- Quickfix navigation
+lt.toggle_quickfix_mode() -- Enter/exit interactive quickfix mode
+lt.show_error_at_point()  -- Show error under cursor in popup
+lt.undo_last_fix()        -- Undo last applied fix
+lt.go_back_without_undo() -- Go to previous error without undoing
+
+-- Command dispatch
+lt.dispatch({ fargs = { "check" } })
+
+-- Lualine component
+lt.status()               -- Returns "✓", "G:3 S:1", or ""
+
+-- Low-level
+lt.apply_fix(bufnr, error_match, suggestion_nr)
+```
+
+## Minimal Config for Issues
+
+```lua
+vim.cmd([[set rtp+=~/.local/share/nvim/lazy/ltqf.nvim]])
+vim.keymap.set("n", "<leader>lc", "<Plug>(LTCheck)")
+```
+
+## Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `language` | `"en-GB"` | Language code for LanguageTool |
+| `languagetool_server_jar` | `""` | Path to `languagetool-server.jar` |
+| `languagetool_server_command` | `""` | Custom server command (overrides jar) |
+| `ignored_words_path` | `stdpath("data")/languagetool_ignored.txt` | Ignore-list file |
+| `check_start_token` | `""` | Line pattern to start checking |
+| `check_end_token` | `""` | Line pattern to stop checking |
+| `exclude_patterns` | `{}` | Line-level exclude patterns |
+| `inline_exclude_patterns` | `{}` | Inline exclude patterns |
 
 ## Credits
 
